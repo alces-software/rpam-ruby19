@@ -87,43 +87,53 @@ int auth_pam_talker(int num_msg,
 }
 
 /* Authenticates a user and returns TRUE on success, FALSE on failure */
-VALUE method_authpam(VALUE self, VALUE username, VALUE password, VALUE servicename) {	
+VALUE method_authpam(VALUE self, VALUE username, VALUE password, VALUE servicename, VALUE with_session) {	
 	char* rpam_servicename;
     pam_auth_t userinfo = {NULL, NULL};
 	struct pam_conv conv_info = {&auth_pam_talker, (void *) &userinfo};
 	pam_handle_t *pamh = NULL;
-	int result;
 
 	rpam_servicename = StringValuePtr(servicename);
 	userinfo.name =    StringValuePtr(username);
 	userinfo.pw =      StringValuePtr(password);
  
-	if ((result = pam_start(rpam_servicename, userinfo.name, &conv_info, &pamh)) 
+	if ((pam_start(rpam_servicename, userinfo.name, &conv_info, &pamh)) 
             != PAM_SUCCESS) {
        
         return Qfalse;
     }
-    if ((result = pam_authenticate(pamh, PAM_DISALLOW_NULL_AUTHTOK))
+    if ((pam_authenticate(pamh, PAM_DISALLOW_NULL_AUTHTOK))
            !=  PAM_SUCCESS) {
 
         pam_end(pamh, PAM_SUCCESS); 
         return Qfalse;
     }
 
-   if ((result = pam_acct_mgmt(pamh, PAM_DISALLOW_NULL_AUTHTOK)) 
+   if ((pam_acct_mgmt(pamh, PAM_DISALLOW_NULL_AUTHTOK)) 
            != PAM_SUCCESS) {
        
         pam_end(pamh, PAM_SUCCESS);
         return Qfalse;
    }
 
-    pam_end(pamh, PAM_SUCCESS);
-    return Qtrue;
+   if (RTEST(with_session)) {
+     if (pam_open_session(pamh, PAM_SILENT) != PAM_SUCCESS) {
+       pam_end(pamh, PAM_SUCCESS);
+       return Qfalse;
+     }
+     if (pam_close_session(pamh, PAM_SILENT) != PAM_SUCCESS) {
+       pam_end(pamh, PAM_SUCCESS);
+       return Qfalse;
+     }
+   }
+
+   pam_end(pamh, PAM_SUCCESS);
+   return Qtrue;
 }
 
 /* initialize */
 void Init_rpam_ext() {
 	Rpam = rb_define_module("Rpam");
 	Rpam_Ext = rb_define_module_under(Rpam, "Ext");
-	rb_define_singleton_method(Rpam_Ext, "authpam", method_authpam, 3);
+	rb_define_singleton_method(Rpam_Ext, "authpam", method_authpam, 4);
 }

@@ -10,7 +10,7 @@ module Rpam
       options = options.dup
       options[:service] ||= 'rpam'
 
-      Rpam::Ext.authpam(user, password, options[:service])
+      Rpam::Ext.authpam(user, password, options[:service], options[:session])
     end
 
     alias :authpam :auth
